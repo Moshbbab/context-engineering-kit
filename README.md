@@ -427,6 +427,7 @@ Additional commands useful before creating a task:
 | `team-lead` | Step parallelization, agent assignment, execution planning | `/plan` (Phase 5) |
 | `qa-engineer` | Verification rubrics, quality gates, LLM-as-Judge definitions | `/plan` (Phase 6) |
 | `developer` | Code implementation, TDD execution, quality review, verification | `/implement` |
+| `code-reviewer` | Verifies implementation against the per-step verification spec and evaluates code quality | `/implement` |
 | `tech-writer` | Technical documentation writing, API guides, architecture updates, lessons learned | `/implement` |
 
 
