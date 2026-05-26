@@ -771,49 +771,235 @@ CRITICAL:
 
 **This is a SEPARATE evaluation stage.** Apply the 7 types of waste from Lean/Kaizen methodology to the newly written code. **YOU MUST FILL THE WASTE TABLE in the scratchpad's Stage 7 section** — every row must have a Found Yes/No answer. For each waste with `Found: Yes`, document evidence (file:line), assign an impact level, calculate the score reduction from the Waste Impact Scoring table, and write a recommendation.
 
-The table is a structured output requirement; the prose definitions below remain authoritative for what each waste type means.
+The table is a structured output requirement; the prose definitions below remain authoritative for what each waste type means in a code-quality context. Focus on code structure and general performance patterns (parallelization, N+1 queries, double serialization) — NOT micro-optimizations or style preferences.
 
 Examine the code for each waste type:
 
-**1. Overproduction** -- Building more than needed
-- Features or code paths no one asked for
-- Overly complex solutions for simple problems
-- Premature optimization or unnecessary abstractions
-- Speculative generality ("might need this later")
+**1. Overproduction** -- Code written beyond what the task requires
 
-**2. Waiting** -- Code that causes idle time
-- Missing async/parallel execution where possible
-- Synchronous operations that could be concurrent
-- Unnecessary sequential dependencies
+Anti-patterns:
+- Speculative features or parameters added "for future flexibility"
+- Premature abstractions (interfaces, generics, factories) with only one implementation
+- Configuration knobs no caller uses
+- Public API surface exposed beyond actual callers
+- Helper functions written but never called
 
-**3. Transportation** -- Moving data around unnecessarily
-- Excessive data transformations between layers
-- Unnecessary serialization/deserialization cycles
-- API layers that add no value (pass-through wrappers)
-- Redundant data mapping between identical shapes
+NOT waste:
+- Abstractions justified by ≥2 current call sites (Rule of Three)
+- Parameters required by the step specification
+- Extensibility points the spec explicitly requested
 
-**4. Over-processing** -- Doing more than necessary
-- Excessive validation of already-validated data
-- Redundant null checks on non-nullable types
-- Overly verbose logging in production paths
-- Unnecessary computation or data fetching
+Example:
 
-**5. Inventory** -- Accumulated unfinished work
-- Dead code, commented-out code, TODO comments without tracking
-- Unused imports, unused variables, unused parameters
-- Half-implemented features or abandoned code paths
+```ts
+// Incorrect — generic "Repository<T>" with one user
+class Repository<T, K extends string = "id"> {
+  findBy(field: K, value: unknown): Promise<T> { /* ... */ }
+}
+// Correct — concrete repository the only caller actually needs
+class UserRepository {
+  findById(id: string): Promise<User> { /* ... */ }
+}
+```
 
-**6. Motion** -- Unnecessary movement or context switching
-- Functions that require reading multiple files to understand
+**2. Waiting** -- Idle time introduced by serialized async work
+
+Anti-patterns:
+- Sequential `await` on independent operations (no data dependency between them)
+- Loop that `await`s a fetch/query per iteration when batching is available
+- Blocking synchronous I/O inside an async handler
+- Manual polling loops where event-driven mechanisms exist
+
+NOT waste:
+- Sequential `await` where the second call depends on the first's result
+- Intentional rate-limiting or backpressure
+- Single `await` in a function (nothing to parallelize)
+
+Example:
+
+```ts
+// Incorrect — independent calls awaited sequentially
+const dataA = await serviceA.getData(key);
+const dataB = await serviceB.getData(key);
+// Correct — parallelized with Promise.all
+const [dataA, dataB] = await Promise.all([
+  serviceA.getData(key),
+  serviceB.getData(key),
+]);
+```
+
+**3. Transportation** -- Data moved or reshaped between layers for no value
+
+Anti-patterns:
+- DTO ↔ entity ↔ DTO round-trips where shapes are identical
+- Double serialization (object → JSON string → parsed object → re-serialized)
+- Pass-through wrapper methods that only forward arguments
+- N+1 query patterns: fetching a list then querying per item instead of joining/batching
+- Request DTO -> Entity DTO mapping, while single Entity DTO can be used directly without field naming changes or unnecesary flattening/nesting
+
+NOT waste:
+- Mapping at a true boundary (domain ↔ persistence, domain ↔ transport) where shapes legitimately differ
+- Anti-corruption layers translating an external API into the domain model
+
+Examples:
+
+```ts
+// Incorrect — N+1 across a boundary
+const orders = await db.findOrders(userId);
+for (const o of orders) o.items = await db.findItems(o.id);
+// Correct — single batched query
+const orders = await db.findOrdersWithItems(userId);
+```
+
+```ts
+// Incorrect — unnecessary mapping
+const order = await db.findOrder(userId);
+return mapToDTO(order);
+// Correct — single Entity DTO used everywhere
+return await db.findOrder(userId);
+```
+
+**4. Over-processing** -- Work the code performs that produces no observable benefit
+
+Anti-patterns:
+- Re-validating data already validated at a trusted upstream boundary
+- Null/undefined checks on values typed as non-nullable
+- Defensive `try/catch` that re-throws the same error unchanged or trying to catch function error that already handled inside the function
+- Recomputing inside a loop a value that is invariant for the loop
+- Logging the same event at multiple layers of the call stack
+
+NOT waste:
+- Validation at trust boundaries (HTTP edge, message queue consumer, public SDK entry point)
+- Null checks when the type system genuinely allows null
+- Idempotency checks where required for correctness
+
+Example:
+
+```ts
+// Incorrect — null check on a non-nullable parameter
+function greet(user: User) {
+  if (!user) 
+    return "";
+  return `Hello, ${user.name}`;
+}
+// Correct — trust the type
+function greet(user: User) {
+  return `Hello, ${user.name}`;
+}
+// Or correct - change the type
+function greet(user: User | null) {
+  if (!user) 
+    return "";
+  return `Hello, ${user.name}`;
+}
+```
+
+**5. Inventory** -- Unfinished or unused code accumulating in the diff
+
+Anti-patterns:
+- Dead code: unreachable branches, unused exports, never-called functions
+- Commented-out blocks left in place
+- `TODO` / `FIXME` comments for already implemented changes
+- Unused imports, unused variables, unused function parameters
+- Feature flags for fully rolled-out features
+- Dublicated code, functions, classes, files, logic that can be generalized and reused.
+
+NOT waste:
+- Exported APIs intentionally part of the public surface even if unused internally
+
+Example:
+
+```ts
+// Incorrect — dublicated logic
+function calcA(x: number, isLegacy: boolean) {
+  if (isLegacy) 
+    return x * 0.9;
+  return x * 1.1;
+}
+function calcB(x: number, isLegacy: boolean) {
+  if (isLegacy) 
+    return x * 1.2;
+  return x * 0.8;
+}
+// Correct — generalize and reuse
+function calc(x: number, isLegacy: boolean, {legacy, modern}: Coefficients) {
+  if (isLegacy) 
+    return x * legacy;
+  return x * modern;
+}
+```
+
+**6. Motion** -- Cognitive overhead from how code is organized
+
+Anti-patterns:
+- Logic for one feature scattered across many files organized by technical layer
 - Circular dependencies between modules
-- Code organized by technical layer rather than feature/domain
-- Configurations scattered across many files
+- Configuration values spread across multiple files when they belong together
+- Helpers placed far from their only caller
+- Inconsistent ordering (e.g., methods sorted differently across sibling classes)
 
-**7. Defects** -- Code likely to produce bugs
-- Missing error handling for external calls
-- Race conditions in async code
-- Implicit type coercions
-- Missing boundary checks or input validation
+NOT waste:
+- Layering enforced by clean architecture / DDD when each layer has cohesive responsibility
+- Cross-cutting utilities (logging, telemetry) shared from a central location
+
+Examples:
+
+Incorrect — one feature smeared across layers
+- src/controllers/orderController.ts
+- src/services/orderService.ts
+- src/utils/orderHelpers.ts
+- src/types/order.ts — and nothing else imports any of these
+Correct — co-locate by feature
+- src/features/order/{controller,service,helpers,types}.ts
+
+```ts
+// Incorrect - unrelated code in same file and related code in different file
+// helpers.ts
+function validateOrder(order: Order) { /* ... */ }
+
+function updateUser(user: User) { /* ... */ }
+
+// common.ts
+function processOrder(order: Order) { /* ... */ }
+
+function processUser(user: User) { /* ... */ }
+
+// Correct - colocated logic in same file
+// order.ts
+function validateOrder(order: Order) { /* ... */ }
+function processOrder(order: Order) { /* ... */ }
+
+// user.ts
+function validateUser(user: User) { /* ... */ }
+function processUser(user: User) { /* ... */ }
+```
+
+**7. Defects** -- Code patterns likely to produce bugs
+
+Anti-patterns:
+- Missing error handling around external calls (HTTP, DB, filesystem)
+- Race conditions: shared mutable state across concurrent async paths
+- Implicit type coercion in equality or arithmetic (`==`, untyped JSON)
+- Missing input validation at trust boundaries
+- Off-by-one errors, unguarded array access, unchecked optional unwraps
+
+NOT waste:
+- Errors propagated intentionally to a caller that handles them
+- Validated inputs trusted downstream
+
+Example:
+
+```ts
+// Incorrect — unhandled external failure, implicit coercion
+const res = await fetch(url);
+const body = await res.json();
+if (body.count == "0") return [];
+// Correct — explicit failure handling and strict comparison
+const res = await fetch(url);
+if (!res.ok) throw new ExternalServiceError(url, res.status);
+const body = OrdersResponse.parse(await res.json());
+if (body.count === 0) return [];
+```
 
 **Waste Impact Scoring:**
 
@@ -827,85 +1013,47 @@ Examine the code for each waste type:
 
 #### Process
 
-1. **Define scope**: Codebase area or process
-2. **Examine for each waste type**
-3. **Quantify impact** (time, complexity, cost)
+1. **Define scope**: The changed files / functions under review
+2. **Examine for each waste type** using the definitions above
+3. **Quantify impact** (correctness risk, maintenance burden, runtime cost)
 4. **Prioritize by impact**
-5. **Propose elimination strategies**
+5. **Propose elimination strategies** (concrete refactor, with file:line)
 
-#### Example: API Codebase Waste Analysis
+#### Example: Code-Level Waste Analysis
 
 ```
-SCOPE: REST API backend (50K LOC)
+SCOPE: src/features/checkout/checkoutService.ts (PR diff, 180 lines added)
 
-1. OVERPRODUCTION
-   Found:
-   • 15 API endpoints with zero usage (last 90 days)
-   • Generic "framework" built for "future flexibility" (unused)
-   • Premature microservices split (2 services, could be 1)
-   • Feature flags for 12 features (10 fully rolled out, flags kept)
+1. OVERPRODUCTION — Found: Yes (Medium)
+   • `CheckoutOptions` interface declares `retryStrategy`, `auditSink`, `featureFlags` fields, none read by any caller (checkoutService.ts:14-22)
+   Recommendation: Drop unused fields; reintroduce when a real caller needs them.
 
-   Impact: 8K LOC maintained for no reason
-   Recommendation: Delete unused endpoints, remove stale flags
+2. WAITING — Found: Yes (High)
+   • Cart total and user profile fetched sequentially though independent (checkoutService.ts:54-55)
+       const cart = await cartRepo.get(userId);
+       const profile = await userRepo.get(userId);
+   Recommendation: Use Promise.all to parallelize.
 
-2. WAITING
-   Found:
-   • CI pipeline: 45 min (slow Docker builds)
-   • PR review time: avg 2 days
-   • Deployment to staging: manual, takes 1 hour
+3. TRANSPORTATION — Found: Yes (High)
+   • N+1: for each cart line, queries `productRepo.findById` in a loop (checkoutService.ts:71-75)
+   Recommendation: Replace with `productRepo.findManyByIds(ids)` batch query.
 
-   Impact: 2.5 days wasted per feature
-   Recommendation: Cache Docker layers, PR review SLA, automate staging
+4. OVER-PROCESSING — Found: Yes (Low)
+   • Re-validates `userId` with `assertUuid()` after the controller already parsed it via the route schema (checkoutService.ts:48)
+   Recommendation: Remove redundant assertion; trust the boundary.
 
-3. TRANSPORTATION
-   Found:
-   • Data transformed 4 times between DB and API response:
-     DB → ORM → Service → DTO → Serializer
-   • Request/response logged 3 times (middleware, handler, service)
-   • Files uploaded → S3 → CloudFront → Local cache (unnecessary)
+5. INVENTORY — Found: Yes (Low)
+   • Unused import `formatLegacyPrice` (checkoutService.ts:6)
+   • `// TODO: support gift cards` with no ticket (checkoutService.ts:92)
+   Recommendation: Remove import; link TODO to an issue or delete or implement it.
 
-   Impact: 200ms avg response time overhead
-   Recommendation: Reduce transformation layers, consolidate logging
+6. MOTION — Found: No
+   • Feature is co-located in src/features/checkout; no scatter observed.
 
-4. OVER-PROCESSING
-   Found:
-   • Every request validates auth token (even cached)
-   • Database queries fetch all columns (SELECT *)
-   • JSON responses include full object graphs (nested 5 levels)
-   • Logs every database query in production (verbose)
-
-   Impact: 40% higher database load, 3x log storage
-   Recommendation: Cache auth checks, selective fields, trim responses
-
-5. INVENTORY
-   Found:
-   • 23 open PRs (8 abandoned, 6+ months old)
-   • 5 feature branches unmerged (completed but not deployed)
-   • 147 open bugs (42 duplicates, 60 not reproducible)
-   • 12 hotfix commits not backported to main
-
-   Impact: Context overhead, merge conflicts, lost work
-   Recommendation: Close stale PRs, bug triage, deploy pending features
-
-6. MOTION
-   Found:
-   • Developers switch between 4 tools for one deployment
-   • Manual database migrations (error-prone, slow)
-   • Environment config spread across 6 files
-   • Copy-paste secrets to .env files
-
-   Impact: 30min per deployment, frequent mistakes
-   Recommendation: Unified deployment tool, automate migrations
-
-7. DEFECTS
-   Found:
-   • 12 production bugs per month
-   • 15% flaky test rate (wasted retry time)
-   • Technical debt in auth module (refactor needed)
-   • Incomplete error handling (crashes instead of graceful)
-
-   Impact: Customer complaints, rework, downtime
-   Recommendation: Stabilize tests, refactor auth, add error boundaries
+7. DEFECTS — Found: Yes (Critical)
+   • `paymentGateway.charge(...)` invoked without try/catch; on failure the cart is already marked "paid" in DB (checkoutService.ts:118-124)
+   Recommendation: Wrap charge in try/catch; mark cart paid only after
+   gateway returns success.
 ```
 
 ### STAGE 8: Score Calculation

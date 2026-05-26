@@ -1,6 +1,6 @@
 ---
 name: design-testing-strategy
-description: Use before writing any type of tests. Distills 15 industry sources into deterministic decision gates, schemas, and worked test examples.
+description: Use before writing any type of tests. Distills 14 industry sources into deterministic decision gates, schemas, and worked test examples.
 ---
 
 # Design Testing Strategy
@@ -11,7 +11,7 @@ This skill is **decision-oriented**, not philosophical: every gate is determinis
 
 ## How To Use This Skill
 
-1. Read **Decision Gates** in order (Gate 0 -> Gate 7). Each gate is independent — you may finish with any subset of test types ON.
+1. Read **Decision Gates** in order (Gate 0 -> Gate 6). Each gate is independent — you may finish with any subset of test types ON.
 2. Apply **Strategic Skip Heuristics** to remove ON gates that would yield low ROI for this artifact.
 3. For each ON gate, fill the **Test Matrix Schema** (`selected_types` entry) — the field order is load-bearing.
 4. List rejected types in `rejected_types` and deliberate skips in `deliberately_skipped`.
@@ -33,12 +33,11 @@ Apply gates in numeric order. Each gate produces an independent boolean (`applie
 | 4 | **Contract** | Public API consumed by >=1 distinct clients (mobile + web, multiple internal services, external partners) AND independent deploy cadence | API where consumer and provider deploy together | [Pact / CDC](https://docs.pact.io/) + [Pactflow CDC explainer](https://pactflow.io/what-is-consumer-driven-contract-testing/) |
 | 5 | **Smoke** | Deployable surface (web app, API, service) AND a deploy/CI pipeline exists where post-deploy validation is meaningful | Library, internal helper, or no deploy pipeline | [Google "What Makes a Good End-to-End Test"](https://testing.googleblog.com/2016/09/testing-on-toilet-what-makes-good-end.html) — smoke = minimal e2e for deploy gate |
 | 6 | **Property-Based** | Input domain is large or unbounded (numeric ranges, strings, lists, parsers, serializers, encoders, math) AND invariants are stable (round-trip, idempotency, monotonicity, commutativity) AND criticality >= MEDIUM-HIGH | Small finite input domain, unstable invariants, or LOW criticality | [Hypothesis / QuickCheck](https://hypothesis.works/articles/what-is-property-based-testing/) |
-| 7 | **Mutation** | Criticality is `HIGH` AND artifact is pure-logic core (financial calculation, security-critical validation, encryption, authorization decisions, parsers for untrusted input) AND existing unit test suite is mature | Glue code, controllers, UI, configuration, anything not mature in unit coverage | [Stryker / PIT](https://stryker-mutator.io/) — meta-test of test-suite quality, sparingly |
 
 ### Gate Application Algorithm
 
 ```
-for gate in [Gate 0, Gate 1, ..., Gate 7]:
+for gate in [Gate 0, Gate 1, ..., Gate 6]:
     if gate.ON_condition_met(artifact):
         result[gate.type] = applies: true
     else:
@@ -48,7 +47,7 @@ if Gate 0 is true:
     short-circuit: emit empty selected_types, document criticality=NONE, stop
 ```
 
-**Criticality Scale** (used by Gates 3, 6, 7):
+**Criticality Scale** (used by Gates 3 and 6):
 
 | Level | Definition |
 |-------|------------|
@@ -71,7 +70,6 @@ if Gate 0 is true:
 | **smoke** | Post-deploy go/no-go: hit / health, key endpoints respond, login works | Detailed correctness; smoke is shallow by design | Playwright (1-3 critical paths), HTTP probe scripts, k6 minimal scenarios | Real deployed environment | Large |
 | **contract** | Public API consumed by 2+ distinct clients with independent deploy cadence | Single-consumer internal API; provider and consumer deploy together | [Pact](https://docs.pact.io/), Spring Cloud Contract, OpenAPI schema validators | Pact broker or contract files in repo | Medium |
 | **property-based** | Large/unbounded input domain with stable invariants (parser, serializer, encoder, math) | Small finite input space; unstable invariants | [Hypothesis](https://hypothesis.works/) (Python), fast-check (TS), QuickCheck (Haskell), jqwik (Java), proptest (Rust) | Same as unit | Small |
-| **mutation** | HIGH-criticality pure-logic core with mature unit suite to assess test-quality | Glue code, controllers, UI, config | [Stryker](https://stryker-mutator.io/) (JS/TS/.NET), PIT (Java), mutmut (Python), go-mutesting (Go) | Existing unit tests | Small (slow — runs unit suite N times) |
 
 ### Google Test Size Mapping
 
@@ -220,7 +218,6 @@ Explicit "don't bother" rules. Skipping these is not laziness — it is risk-adj
 |------|------|
 | **No e2e for internal helpers** | If artifact has no UI surface and no user-facing path, skip e2e. Unit + integration is sufficient. |
 | **No contract test for bound by deploy consumer API** | If only one client consumes the API and they deploy together, contract testing adds maintenance with no decoupling benefit. |
-| **No mutation on glue code** | Mutation testing on controllers, DTOs, framework wiring produces noise. Reserve for HIGH-criticality pure-logic core. |
 | **No property-based on small finite domains** | If input space is `enum {A, B, C}`, EP + BVA already covers it; property-based adds infra without finding more bugs. |
 | **No integration test for pure functions** | Adding a Postgres container to test a `formatCurrency` helper is waste. Unit only. |
 | **No component test for static markup** | If the component has no state, no events, no conditional rendering, a snapshot is enough — or skip entirely. |
@@ -245,16 +242,16 @@ test_strategy:
 
   selected_types:
     - rationale: "Why this type is being applied to this artifact (specific, evidence-based)"
-      type: "unit | integration | component | e2e | smoke | contract | property-based | mutation"
+      type: "unit | integration | component | e2e | smoke | contract | property-based"
       size: "small | medium | large | enormous"
-      framework: "vitest | jest | pytest | go test | JUnit | playwright | cypress | pact | hypothesis | stryker | ..."
+      framework: "vitest | jest | pytest | go test | JUnit | playwright | cypress | pact | hypothesis | ..."
       dependencies:
         - "List of dependencies: real Postgres via Testcontainers, in-memory fake, mocked HTTP via nock, etc."
       gate: "Gate N (the gate that triggered this selection)"
 
   rejected_types:
     - reason: "Why this type does NOT apply to this artifact (cite Strategic Skip Heuristic or gate that did not trigger)"
-      type: "unit | integration | component | e2e | smoke | contract | property-based | mutation"
+      type: "unit | integration | component | e2e | smoke | contract | property-based"
 
   deliberately_skipped:
     - why: "Cost / risk justification for skipping despite a partial signal"
@@ -296,8 +293,6 @@ test_strategy:
       type: "e2e"
     - reason: "Input domain (email, password) is large but invariants are well-covered by EP+BVA at unit level — property-based ROI is low at MEDIUM-HIGH criticality, only triggers Gate 6 partially"
       type: "property-based"
-    - reason: "Glue code with framework integration; mutation testing produces noise on non-pure-logic core — Gate 7 OFF"
-      type: "mutation"
 
   deliberately_skipped:
     - why: "Project does not have post-deploy probe pipeline yet; smoke would be no-op"
@@ -369,7 +364,7 @@ Where:
 
 ## Sources & Further Reading
 
-These 15 sources back every gate and rule above. When in doubt, consult the source linked at that gate.
+These 14 sources back every gate and rule above. When in doubt, consult the source linked at that gate.
 
 1. **Test Pyramid** — Mike Cohn (2009, *Succeeding with Agile*) + Ham Vocke, [The Practical Test Pyramid](https://martinfowler.com/articles/practical-test-pyramid.html), martinfowler.com.
 2. **Testing Trophy** — Kent C. Dodds (2018), [The Testing Trophy and Testing Classifications](https://kentcdodds.com/blog/the-testing-trophy-and-testing-classifications) and [Write Tests](https://kentcdodds.com/blog/write-tests).
@@ -383,9 +378,8 @@ These 15 sources back every gate and rule above. When in doubt, consult the sour
 10. **Property-based testing** — [Hypothesis: What is property-based testing?](https://hypothesis.works/articles/what-is-property-based-testing/); QuickCheck (Haskell), fast-check (TS).
 11. **Contract testing / Consumer-Driven Contracts** — [Pact docs](https://docs.pact.io/); [Pactflow CDC explainer](https://pactflow.io/what-is-consumer-driven-contract-testing/).
 12. **Testcontainers** — [testcontainers.com](https://testcontainers.com/).
-13. **Mutation testing** — [Stryker Mutator](https://stryker-mutator.io/); PIT (Java).
-14. **Table-driven tests** — Dave Cheney, [Prefer table-driven tests](https://dave.cheney.net/2019/05/07/prefer-table-driven-tests); [Go wiki: TableDrivenTests](https://go.dev/wiki/TableDrivenTests).
-15. **Risk-based testing** — [Risk Management During Test Planning (softwaretestinghelp.com)](https://www.softwaretestinghelp.com/risk-management-during-test-planning-risk-based-testing/).
+13. **Table-driven tests** — Dave Cheney, [Prefer table-driven tests](https://dave.cheney.net/2019/05/07/prefer-table-driven-tests); [Go wiki: TableDrivenTests](https://go.dev/wiki/TableDrivenTests).
+14. **Risk-based testing** — [Risk Management During Test Planning (softwaretestinghelp.com)](https://www.softwaretestinghelp.com/risk-management-during-test-planning-risk-based-testing/).
 
 ---
 
@@ -430,7 +424,6 @@ function formatCurrency(amount: number, code: string): string;
 | 4 Contract | OFF | Not a public API |
 | 5 Smoke | OFF | Not deployable |
 | 6 Property-Based | **ON** (partial) | Numeric input is unbounded, but invariants exist (round-trip via parse, monotonicity in amount) — [Hypothesis](https://hypothesis.works/articles/what-is-property-based-testing/). Promote at MEDIUM-HIGH; here LOW criticality means we apply it sparingly (1-2 properties) |
-| 7 Mutation | OFF | LOW criticality |
 
 **`test_strategy` YAML**
 
@@ -465,8 +458,6 @@ test_strategy:
       type: "contract"
     - reason: "Library helper, no deploy pipeline target - Gate 5 OFF"
       type: "smoke"
-    - reason: "LOW criticality and unit suite covers logic; meta-testing is over-investment - Gate 7 OFF"
-      type: "mutation"
 
   deliberately_skipped:
     - why: "Locale list is finite (USD, EUR); exhaustive enumeration via decision table is sufficient and more maintainable than i18n property tests"
@@ -494,7 +485,7 @@ test_strategy:
 
 ```
 
-**Why types were rejected**: Helper has no boundaries (no integration), no UI (no component/e2e), is internal and library-style (no contract/smoke), and at LOW criticality the cost of mutation testing far exceeds the benefit.
+**Why types were rejected**: Helper has no boundaries (no integration), no UI (no component/e2e), is internal and library-style (no contract/smoke), and at LOW criticality the cost of additional test types far exceeds the benefit.
 
 ---
 
@@ -535,7 +526,6 @@ A user-registration endpoint that:
 | 4 Contract | **ON** | Two distinct consumers (mobile + web) on independent deploy cadences — [Pact CDC](https://pactflow.io/what-is-consumer-driven-contract-testing/) |
 | 5 Smoke | **ON** | Deployable HTTP service; post-deploy probe of `/users` registration is meaningful — [Google e2e](https://testing.googleblog.com/2016/09/testing-on-toilet-what-makes-good-end.html) |
 | 6 Property-Based | OFF | Input domain (email, password, age) is constrained and well-covered by EP+BVA at unit; criticality is MEDIUM-HIGH but Gate 6 OFF on bounded inputs — [Skip Heuristic](https://hypothesis.works/articles/what-is-property-based-testing/) |
-| 7 Mutation | OFF | Endpoint is glue code (validation + DB + queue) not pure-logic core; mutation noise > signal — [Skip Heuristic](https://stryker-mutator.io/) |
 
 **`test_strategy` YAML**
 
@@ -578,8 +568,6 @@ test_strategy:
       type: "e2e"
     - reason: "Input domain is bounded and EP+BVA at unit level covers it; property-based on this glue endpoint adds infra without finding more bugs - Gate 6 OFF"
       type: "property-based"
-    - reason: "Glue code (validation + DB + queue), not pure-logic core; mutation noise > signal at MEDIUM-HIGH criticality - Gate 7 OFF"
-      type: "mutation"
 
   deliberately_skipped:
     - why: "Performance/load testing is out of scope here; tracked in dedicated performance backlog"
@@ -620,7 +608,7 @@ test_strategy:
 - [contract] Provider satisfies web pact: POST /users response shape matches web contract
 ```
 
-**Why types were rejected**: No UI surface (component/e2e belong to consumer apps), bounded input space (property-based ROI low), glue code rather than pure-logic core (mutation noise), out-of-scope concerns (load, multi-region) deliberately skipped with rationale.
+**Why types were rejected**: No UI surface (component/e2e belong to consumer apps), bounded input space (property-based ROI low), out-of-scope concerns (load, multi-region) deliberately skipped with rationale.
 
 ---
 
@@ -660,7 +648,6 @@ A React form component:
 | 4 Contract | OFF | UI consumes API; provider-side contract tests live in Example B |
 | 5 Smoke | **ON** | Web app is deployed; smoke for "registration page renders and submits" is meaningful |
 | 6 Property-Based | OFF | Bounded form inputs; EP+BVA covers them |
-| 7 Mutation | OFF | UI rendering, not pure-logic core |
 
 **`test_strategy` YAML**
 
@@ -703,8 +690,6 @@ test_strategy:
       type: "contract"
     - reason: "Bounded input space; EP+BVA at unit level is sufficient - Gate 6 OFF"
       type: "property-based"
-    - reason: "UI rendering, not pure-logic core; mutation produces noise - Gate 7 OFF"
-      type: "mutation"
 
   deliberately_skipped:
     - why: "Cross-browser e2e on legacy browsers (IE11) is out of support per project browser matrix"
@@ -749,7 +734,7 @@ test_strategy:
 
 ```
 
-**Why types were rejected**: This artifact is a UI consumer — its real boundary is the API, which is tested as integration in Example B (provider side). Property-based and mutation are not justified for bounded UI input handling. Cross-browser legacy and visual-regression are out of scope and explicitly skipped with rationale.
+**Why types were rejected**: This artifact is a UI consumer — its real boundary is the API, which is tested as integration in Example B (provider side). Property-based testing is not justified for bounded UI input handling. Cross-browser legacy and visual-regression are out of scope and explicitly skipped with rationale.
 
 ---
 
@@ -757,7 +742,7 @@ test_strategy:
 
 Before declaring a strategy complete, the loading verify:
 
-- [ ] All 8 gates evaluated explicitly (ON/OFF + reason).
+- [ ] All 7 gates evaluated explicitly (ON/OFF + reason).
 - [ ] `selected_types[*]` order is `rationale -> type -> size -> framework -> dependencies -> gate`.
 - [ ] `rejected_types[*]` order is `reason -> type`.
 - [ ] `deliberately_skipped[*]` order is `why -> what`.
@@ -768,3 +753,7 @@ Before declaring a strategy complete, the loading verify:
 - [ ] At least one [Strategic Skip Heuristic](#strategic-skip-heuristics) was applied or explicitly considered and overridden with rationale.
 
 If any check fails, revise the strategy before delivering.
+
+## Coverage Analysis
+
+Mutation testing and other coverage-analysis methods (used **after** tests are written to assess test-suite quality) are documented in the companion `test-coverage` skill.
