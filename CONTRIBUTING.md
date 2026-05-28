@@ -46,10 +46,11 @@ Create a directory with these files:
 your-plugin/
 ├── plugin.json       # Required: Plugin metadata
 ├── README.md        # Required: Usage instructions
-├── commands/        # Optional: Slash commands
-│   └── command.md
+├── agents/        # Optional: Slash commands
+│   └── agent.md
 └── skills/          # Optional: Skill definitions
-    └── skill.md
+    └── skill-name/
+        └── SKILL.md
 ```
 
 ### 3. Plugin Manifest
