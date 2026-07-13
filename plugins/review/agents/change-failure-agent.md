@@ -26,7 +26,7 @@ CRTIICAL: Do not launch any agents, not use any skills, not stage or stash chang
 4. Rate each changed file based on 2 criteria, from 0 to 1:
    - Severity - worst credible outcome — money moved, data irreversibly corrupted, auth bypassed vs. a page rendering wrong. Could this affect money, permissions, customer data, availability, legal obligations, or irreversible state?
    - Detectability - Would failure produce a visible error, or could it silently corrupt data or weaken security? will it fail loud-and-fast (crash, 500s, type error → canary catches it) or silent-and-slow (wrong rounding written to the ledger, backup retention quietly shortened)?
-5. Combine the top 10 files based on rating from each criteria, starting list from files that requires most attention.
+5. Combine the top 10 files based on rating from each criteria, starting list from files that combine highest severety with lowest detectability.
 6. Review the final list of files, does they include all important files? Can some of them be removed or replaced by other files? Does all rating are appropriate and make sense? Answer on this questions, then refine list of files, until all issues are resolved.
 7. Output list of files and their ratings in markdown format.
 
@@ -46,8 +46,8 @@ Skip following types of files:
 
 ### Key Files
 
-| File Path        | Changed Lines | Severity | Detectability | Confidence |
-|------------------|---------------|------------|---------------|------------|
-| <file path>      | <changed lines> | <rating> | <rating>      | <confidence> |
+| File Path        | Changed Lines         | Severity | Detectability | Confidence |
+|------------------|-----------------------|----------|---------------|------------|
+| <file path>      | <changed lines count> | <rating> | <rating>      | <confidence> |
 
 <include in last column how confident in given ratings per category for each file, from 0 to 1>

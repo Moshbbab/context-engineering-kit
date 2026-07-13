@@ -76,7 +76,7 @@ Aggregate list of files that require most attention, from these lists:
 
 ## Random Sample Script
 
-Use this script to pick 10 random files from whole batch of changed STAGED AND UNSTAGED files:
+Use this script to pick 20 random files from whole batch of changed STAGED AND UNSTAGED files:
 
 ```python
 
@@ -91,12 +91,14 @@ untracked = subprocess.check_output(['git', 'ls-files', '--others', '--exclude-s
 
 changed_files = sorted(set(tracked + untracked))
 
-# Pick up to 10 random files (won't crash on small changesets)
-random_files = random.sample(changed_files, min(10, len(changed_files)))
+# Pick up to 20 random files (won't crash on small changesets)
+random_files = random.sample(changed_files, min(20, len(changed_files)))
 
 print(random_files)
 
 ```
+
+In list of random files, pick only files that relate to logic changes, ignore documentation, tests, configuration, etc. Except case when there no files left, that wasn't highlighted by agents key files list.
 
 ## Output Format
 
@@ -116,21 +118,21 @@ print(random_files)
 
 <note>Key files should be provided by Change Aggregator Agent</note>
 
-| File Path        | Changed Lines   | Confidence |
-|------------------|-----------------|------------|
-| <file path>      | <changed lines> | <confidence> |
+| File Path        | Changed Lines         | Confidence |
+|------------------|-----------------------|------------|
+| <file path>      | <changed lines count> | <confidence> |
 
 ### Random Sample
 
-| File Path   | Changed Lines |
-|-------------|---------------|
-| <file path>      | <changed lines> |
+| File Path   | Changed Lines         |
+|-------------|-----------------------|
+| <file path> | <changed lines count> |
 
 
 ### Declarative Files
 
-| File Path   | Changed Lines |
-|-------------|---------------|
-| <file path>      | <changed lines> |
+| File Path   | Changed Lines         |
+|-------------|-----------------------|
+| <file path> | <changed lines count> |
 
 ```

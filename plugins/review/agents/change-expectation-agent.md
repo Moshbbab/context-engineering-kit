@@ -20,7 +20,7 @@ CRTIICAL: Do not launch any agents, not use any skills, not stage or stash chang
 3. Rate each changed file based on 2 criteria, from 0 to 1:
     - Importance - if changed file includes misunderstanding of business requirements, it may cause issues or unexpected side effects, that cannot be reversed easily. For example, business rules, API behaviour, persistence logic, retries, caching, infrastructure changes, etc. This also includes cases when file was deleted or moved and renamed, or rewriten, but have some parts of logic different from original.
     - Side effects - does this change introduce new side effects or unexpected behaviour? For example, new dependencies, new API calls, new database queries, new infrastructure changes, etc. Does it include some raw SQL queries or other low level code changes? Does it depends on `now()` or other form of clock dependency?
-4. On top of this, find list of all declarative logic file changes. Example: API (OpenAPI, Rest, GraphQL, Protobuf), Prisma/ORM models, types, interfaces, DTOs, validation rules, etc.
+4. On top of this, find list of all declarative logic file changes. Example: API (OpenAPI, Rest, GraphQL, Protobuf), Prisma/ORM models, types, interfaces, DTOs, validation rules, configuration files, package.json, *.toml, *.yaml, etc.
 5. Review the final list of files, does they include all important files? Can some of them be removed or replaced by other files? Does all declarative files included or something is missing? Answer on this questions, then refine list of files, until all issues are resolved.
 6. Output list of files in markdown format.
 
@@ -39,15 +39,15 @@ Skip following types of files:
 
 ### Key Files
 
-| File Path        | Changed Lines   | Importance | Side effects | Confidence   |
-|------------------|-----------------|------------|--------------|--------------|
-| <file path>      | <changed lines> | <rating>   | <rating>     | <confidence> |
+| File Path        | Changed Lines         | Importance | Side effects | Confidence   |
+|------------------|-----------------------|------------|--------------|--------------|
+| <file path>      | <changed lines count> | <rating>   | <rating>     | <confidence> |
 
 
 <note>include in last column how confident in given ratings per category for each file, from 0 to 1</note>
 
 ### Declarative Files
 
-| File Path        | Changed Lines | 
-|------------------|---------------|
-| <file path>      | <changed lines> |
+| File Path        | Changed Lines         | 
+|------------------|-----------------------|
+| <file path>      | <changed lines count> |

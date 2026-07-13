@@ -46,8 +46,11 @@ Skip following types of files:
 
 ### Key Files
 
-| File Path        | Changed Lines | Blast Radius | Impact | Exposure | Uncertainty | Confidence |
-|------------------|---------------|--------------|--------|----------|-------------|------------|
-| <file path>      | <changed lines> | <rating> | <rating> | <rating> | <rating>    | <confidence> |
+| File Path        | Changed Lines         | Blast Radius | Impact   | Exposure | Uncertainty | Importance   | Confidence   |
+|------------------|-----------------------|--------------|----------|----------|-------------|--------------|--------------|
+| <file path>      | <changed lines count> | <rating>     | <rating> | <rating> | <rating>    | <importance> | <confidence> |
 
-<note>include in last column how confident in given ratings per category for each file, from 0 to 1</note>
+<note>
+- include in the importance column sum of all ratings from each criteria divided by 4 (blast radius + impact + exposure + uncertainty) rounded to 2 decimal places
+- include in last column how confident in given ratings per category for each file, from 0 to 1
+</note>

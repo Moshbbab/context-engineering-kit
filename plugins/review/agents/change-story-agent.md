@@ -59,6 +59,6 @@ Key files will include firstly where new guard is used, then where it linked to 
 
 ### Key Files
 
-| File Path   | Changed Lines | Importance | Confidence |
-|-------------|--------------|------------|------------|
-| <file path> | <number>     | <rate how important this file to understand change, from 0 to 1> | <Rate how confident you are in your importance rating, from 0 to 1> |
+| File Path   | Changed Lines         | Importance | Confidence |
+|-------------|-----------------------|------------|------------|
+| <file path> | <changed lines count> | <rate how important this file to understand change, from 0 to 1> | <Rate how confident you are in your importance rating, from 0 to 1> |

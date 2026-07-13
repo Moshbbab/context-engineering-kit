@@ -28,8 +28,11 @@ CRTIICAL: Do not launch any agents, not use any skills, not stage or stash chang
 
 ### Key Files
 
-| File Path        | Changed Lines   | Confidence |
-|------------------|-----------------|------------|
-| <file path>      | <changed lines> | <confidence> |
+| File Path        | Changed Lines         | Importance   | Severity   | Detectability   | Confidence |
+|------------------|-----------------------|--------------|------------|-----------------|------------|
+| <file path>      | <changed lines count> | <importance> | <severity> | <detectability> | <confidence> |
 
-<note>include in last column confidence rating that was provided by agent that provided this file (if there multiple, include highest confidence)</note>
+<note>
+- include in last column confidence rating that was provided by agent that provided this file (if there multiple, include highest confidence)
+- in the rest columns include ratings that were provided by agent that provided this file (if there multiple, include highest rating. If there no rating, mark it as "-")
+</note>
