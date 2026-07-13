@@ -24,7 +24,8 @@ CRITICAL: Human attention and time is limited. Reviewer cannot check all existin
     - change-failure-agent
     - change-expectation-agent
 2. Each agent will produce lists of key files by his opinition. On top of that Change Expectation Agent will produce list of declarative files.
-3. Pass all lists of key files to change-aggregator agent, with EXACTLY same metrics that each agent is outputed to you. Aggregator will build final list of files that require attention.
+3. Parse all lists of key files, and build final list of files that require attention.
+    - Pick top 5 files from each agent. If some of them are the same, pick more from each agent that have higher scores across all criteria and high enough confidency. At this stage your job is to build list until it reach 20 files. (ignore declarative files for this stage)
 4. Run python script to pick 10 random files from whole batch of changed files. Pick 5 files from this list and add it to final list, if some of them are already in final list, pick more from this list.
 5. Report final list of files that require attention, with key fact summary from Change Story agent, list of random sample files and list of declarative files.
 
@@ -36,41 +37,6 @@ Pass this prompt EXACTLY to launch change-story-agent, change-impact-agent, chan
 ```md
 
 Review current project staged AND unstaged changes according to your process and provide list of files that require attention.
-
-```
-
-
-### Change Aggregator Agent
-
-Use this prompt EXACTLY to launch change-aggregator-agent, include there full lists of files from each agent:
-
-```md
-
-Aggregate list of files that require most attention, from these lists:
-
-### Change Story Agent
-
-| File Path   | Changed Lines | Importance | Confidence |
-|-------------|--------------|------------|------------|
-| <file path>      | <changed lines> | <rating> | <confidence> |
-
-### Change Impact Agent
-
-| File Path   | Changed Lines | Blast Radius | Impact | Exposure | Uncertainty | Confidence |
-|-------------|---------------|--------------|--------|----------|-------------|------------|
-| <file path>      | <changed lines> | <rating> | <rating> | <rating> | <rating>    | <confidence> |
-
-### Change Failure Agent
-
-| File Path   | Changed Lines | Severity | Detectability | Confidence |
-|-------------|---------------|------------|---------------|------------|
-| <file path>      | <changed lines> | <rating> | <rating>      | <confidence> |
-
-### Change Expectation Agent
-
-| File Path   | Changed Lines | Importance | Side effects | Confidence   |
-|-------------|-----------------|------------|--------------|--------------|
-| <file path>      | <changed lines> | <rating>   | <rating>     | <confidence> |
 
 ```
 
@@ -108,7 +74,7 @@ In list of random files, pick only files that relate to logic changes, ignore do
 
 <note>Key facts should be provided by Change Story Agent</note>
 
-- What change trying to achive: <explain in 1-2 sentences>
+- What change trying to achive: <if any>
 - Architecture change: <if any>
 - Design decisions: <if any>
 - Risks: <if any>
@@ -116,11 +82,14 @@ In list of random files, pick only files that relate to logic changes, ignore do
 
 ### Key Files
 
-<note>Key files should be provided by Change Aggregator Agent</note>
+| File Path        | Changed Lines         | Importance   | Severity   | Detectability   | Confidence |
+|------------------|-----------------------|--------------|------------|-----------------|------------|
+| <file path>      | <changed lines count> | <importance> | <severity> | <detectability> | <confidence> |
 
-| File Path        | Changed Lines         | Confidence |
-|------------------|-----------------------|------------|
-| <file path>      | <changed lines count> | <confidence> |
+<note>
+- include in last column confidence rating that was provided by agent that provided this file (if there multiple, include highest confidence)
+- in the rest columns include ratings that were provided by agent that provided this file (if there multiple, include highest rating. If there no rating, mark it as "-")
+</note>
 
 ### Random Sample
 
